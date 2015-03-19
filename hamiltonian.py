@@ -6,7 +6,7 @@ Created on Thu Mar 12 10:51:20 2015
 """
 
 import numpy
-
+from collections import Counter
 
 def nearest_neighbours(N,M):
     
@@ -149,5 +149,6 @@ diag,flip = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
 
 print(diag)
 print('\n\n')
-print(flip) #nun ein dictionary, Zugriff mit flip[k] = numpy.array
+for x in flip:
+    print('k:',x,'bisecs:',numpy.sort(flip[x]),'counter:',Counter(flip[x]))  #nun ein dictionary, Zugriff mit flip[k] = numpy.array
 
