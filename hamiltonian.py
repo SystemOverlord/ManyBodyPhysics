@@ -6,7 +6,8 @@ Created on Thu Mar 19 23:40:46 2015
 """
 
 import numpy
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, spdiags
+from scipy.sparse.linalg import eigs
 
 def nearest_neighbours(N,M):
     NN = numpy.array([[0,0]]*N*M)
@@ -194,6 +195,47 @@ def bisection(spin, tofind):
         
     return(None)
 
+def lanczos(H, size_basis, delta, n_max, n_diag):
+    
+    Hx1 = numpy.array([0.0]*size_basis) # initialisiere Produkt von H mit Vektor x_n
+    x0 = numpy.array([0.0]*size_basis) # initialisiere Vektor x_n-1
+    x1 = numpy.random.rand(size_basis) # initialisiere Vektor x_n
+    
+    epsilon = numpy.array([0.0]*size_basis)
+    k = numpy.array([0.0]*size_basis)
+    
+    for n in xrange(size_basis):
+        
+        if n > n_max: break
+        
+        k[n] = numpy.linalg.norm(x1)
+        
+        if k[n] < delta: break
+        
+        x1 /= k[n]
+        
+        Hx1 = H * x1
+        epsilon[n] = numpy.dot(x1, Hx1)
+
+        print(n, k[n], epsilon[n])
+        
+        if ((n+1) % n_diag) == 0:
+            data = [k[0:n+1], epsilon[0:n+1], k[0:n+1]]
+            
+            diags = [-1,0,1]
+            A = spdiags(data,diags,n,n)
+            E = eigs(A)
+            print('Eigenwerte', E)
+        
+        
+        Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
+        x0 = x1
+        print(id(x0))
+        x1 = Hx1
+        #Hx1 = None
+        #print(numpy.linalg.norm(Hx1))
+        
+    return(x1, epsilon, k)
 
 # Main
 
@@ -217,8 +259,10 @@ H = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
 # transformiere H in eine sparse Matrix
 H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
+lanczos(H, len(spin), 1e-10, 100, 10)
+
 #print(diag)
 #print('\n\n')
-print(H) #nun ein dictionary, Zugriff mit flip[k] = numpy.array
+#print(H) #nun ein dictionary, Zugriff mit flip[k] = numpy.array
 
 
