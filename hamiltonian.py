@@ -217,10 +217,10 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
         Hx1 = H * x1
         epsilon[n] = numpy.dot(x1, Hx1)
 
-        print(n, k[n], epsilon[n])
+        #print(n, k[n] < delta, k[n], epsilon[n])
         
         if ((n+1) % n_diag) == 0:
-            data = [k[0:n+1], epsilon[0:n+1], k[0:n+1]]
+            data = [k[0:n], epsilon[0:n], k[0:n]]
             
             diags = [-1,0,1]
             A = spdiags(data,diags,n,n)
@@ -230,10 +230,7 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
         
         Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
         x0 = x1
-        print(id(x0))
         x1 = Hx1
-        #Hx1 = None
-        #print(numpy.linalg.norm(Hx1))
         
     return(x1, epsilon, k)
 
@@ -259,7 +256,7 @@ H = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
 # transformiere H in eine sparse Matrix
 H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
-lanczos(H, len(spin), 1e-10, 100, 10)
+lanczos(H, len(spin), 1e-20, 100, 10)
 
 #print(diag)
 #print('\n\n')
