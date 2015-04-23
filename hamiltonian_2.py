@@ -8,7 +8,7 @@ Created on Thu Mar 19 23:40:46 2015
 import numpy
 from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.linalg import eigsh
-import numpy.linalg.eigvalsh as eigvalsh
+from numpy.linalg import eigvalsh
 import matplotlib.pyplot as plt
 
 def nearest_neighbours(N,M):
@@ -281,6 +281,7 @@ plt.plot(E[:,3], 'k')
 plt.plot(E[:,4], 'c')
 print(H)
 print(E[-1])
+print(len(H.shape))
 print(eigvalsh(H))
 
 

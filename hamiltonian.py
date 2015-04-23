@@ -8,6 +8,7 @@ Created on Thu Mar 19 23:40:46 2015
 import numpy
 from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.linalg import eigs
+from numpy.linalg import qr, eigvalsh
 
 def nearest_neighbours(N,M):
     NN = numpy.array([[0,0]]*N*M)
@@ -258,6 +259,8 @@ H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
 lanczos(H, len(spin), 1e-20, 100, 10)
 
+print(eigvalsh(H))
+print(H.shape)
 #print(diag)
 #print('\n\n')
 #print(H) #nun ein dictionary, Zugriff mit flip[k] = numpy.array
