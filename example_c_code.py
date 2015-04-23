@@ -41,3 +41,7 @@ def velocity_weave(posx, posy, vx, vy, tau, g, c1, c2):
             vy[i] = vy0 + tau*Fy0 - vg;
         }
     '''
+    weave.inline(code,['n','x','posx','posy','vx','vy','tau'])
+    
+    return posx, posy, vx, vy
+    
