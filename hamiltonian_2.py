@@ -9,7 +9,9 @@ import numpy
 from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.linalg import eigsh
 from numpy.linalg import eigvalsh
+from numpy.linalg import eig
 import matplotlib.pyplot as plt
+#from . import eigenvalues
 
 def nearest_neighbours(N,M):
     NN = numpy.array([[0,0]]*N*M)
@@ -208,31 +210,38 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
     
     E = []
     
+    breakvar=0;
     for n in xrange(size_basis):
-        
+       # print('a',n > n_max)
         if n > n_max: break
+            
         
         k[n] = numpy.linalg.norm(x1)
+       # print('k[n]',n,k[n],k[n] < delta)
+        if k[n] < delta: breakvar=1
+        else:
+            x1 /= k[n]
         
-        if k[n] < delta: break
-        
-        x1 /= k[n]
-        
-        Hx1 = H * x1
-        epsilon[n] = numpy.dot(x1, Hx1)
+            Hx1 = H * x1
+            epsilon[n] = numpy.dot(x1, Hx1)
 
         #print(n, k[n], epsilon[n])
         
-        if ((n+1) % n_diag) == 0:
+        if (((n+1) % n_diag) == 0) or (breakvar == 1):
+        #if(n>3):         
             data = [k[0:n], epsilon[0:n], k[0:n]]
             
             diags = [-1,0,1]
             A = spdiags(data,diags,n,n)
-            E0, c = eigsh(A)
+            #print('A Länge:', A.shape)            
+                        
+            E0, c = eigsh(A,n-1)
             E += [E0]
-            #print('Eigenwerte', E)
+            #print('A Länge:', A.shape)            
+            #print('Eigenwerte', E0)
+            print(n_max,n)
         
-        
+        if (breakvar==1): break
         Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
         x0 = x1
         x1 = Hx1
@@ -243,50 +252,45 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
 
 N = 3 # matrix zeile
 M = 3 # matrix spalte
-N2 = 3 #total number of particles with spin up
+N2 = 4 #total number of particles with spin up
 
 spin = numpy.array([2**N2-1], dtype=int)
 spin_up = numpy.array([0], dtype=int)
 spin_down = numpy.array([2**N2-1], dtype=int)
 
 # berechne alle Basiszustände
+print('basis')
 basis(0, 2*N*M, N2, N*M)
 
 # berechne Indizes der Nächste Nachbarn
+print('nearest neighbors')
 NN = nearest_neighbours(N,M)
 
 # berechne Matrix des Heisenberg Hamilton Operators
+print('hamiltonian')
 H = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
+#print('H',H.shape)
 
 # transformiere H in eine sparse Matrix
+print('csr_matrix')
 H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
-#print(eigsh(H))
-x, epsilon, k, E = lanczos(H, len(spin), 1e-15, 1000, 10)
+# lanczos
+print('lanczos')
+x, epsilon, k, E = lanczos(H, len(spin), 0.001, 10000,4)
 
-
-fig1 = plt.figure()
-fig1.show()
-
-plt.plot(k, '-r')
-plt.plot(epsilon, '-b')
+print('plotten')
+E = numpy.array(E)
+print(E.shape)
 
 fig2 = plt.figure()
 fig2.show()
+for i in range(len(E)):
+    for j in range(len(E[i])):
+        plt.plot(i,E[i][j],'or')
+plt.xlim(-1,len(E))
+    
 
-E = numpy.array(E)
-plt.plot(E[:,0], 'r')
-plt.plot(E[:,1], 'g')
-plt.plot(E[:,2], 'b')
-plt.plot(E[:,3], 'k')
-plt.plot(E[:,4], 'c')
-print(H)
-print(E[-1])
-print(len(H.shape))
-print(eigvalsh(H))
-
-
-#print(diag)
-#print('\n\n')
-#print(H) #nun ein dictionary, Zugriff mit flip[k] = numpy.array
-
-
+#plt.plot(E[1], 'g')
+#plt.plot(E[:,2], 'b')
+#plt.plot(E[:,3], 'k')
+#plt.plot(E[:,4], 'c')
