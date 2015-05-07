@@ -6,10 +6,9 @@ Created on Thu Mar 19 23:40:46 2015
 """
 
 import numpy
-from scipy.sparse import csr_matrix, spdiags
-from scipy.sparse.linalg import eigsh
-from numpy.linalg import eigvalsh
-from numpy.linalg import eig
+from scipy import weave
+from scipy.sparse import csr_matrix
+from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 #from . import eigenvalues
 
@@ -212,34 +211,29 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
     
     breakvar=0;
     for n in xrange(size_basis):
-       # print('a',n > n_max)
+
         if n > n_max: break
-            
         
         k[n] = numpy.linalg.norm(x1)
-       # print('k[n]',n,k[n],k[n] < delta)
+        
         if k[n] < delta: breakvar=1
         else:
             x1 /= k[n]
         
             Hx1 = H * x1
             epsilon[n] = numpy.dot(x1, Hx1)
-
-        #print(n, k[n], epsilon[n])
         
         if (((n+1) % n_diag) == 0) or (breakvar == 1):
-        #if(n>3):         
-            data = [k[0:n], epsilon[0:n], k[0:n]]
-            
-            diags = [-1,0,1]
-            A = spdiags(data,diags,n,n)
-            #print('A Länge:', A.shape)            
-                        
-            E0, c = eigsh(A,n-1)
+            P = Hyman(epsilon[0:n],k[0:n])
+            #E0 = fsolve(Hyman_val, 1e300, args=(P), maxfev=int(1000))
+            #E1 = fsolve(Hyman_val, -1e300, args=(P), maxfev=int(1000))
+            #E0 = numpy.roots(P)
+            #E0 = Mises(epsilon[0:n],k[0:n],10000,0.0001)
+            #E += [numpy.array([E0,E0])]
+            E0,sumb = QR(epsilon[0:n],k[0:n],0.001,100)
             E += [E0]
-            #print('A Länge:', A.shape)            
-            #print('Eigenwerte', E0)
-            print(n_max,n)
+            
+            print(n_max,n,sumb)
         
         if (breakvar==1): break
         Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
@@ -248,6 +242,163 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
         
     return(x1, epsilon, k, E)
 
+def Hyman(a,b):
+    #generiert Hyman Polynom für Tridiagonalmatrix
+    #a ... Hauptdiagonale
+    #b ... Nebendiagonale
+    N = len(a)
+    
+    P1 = numpy.array([0]*N)
+    P2 = numpy.array([0]*N)
+    P1[-1] = 1
+    P2[-2] = a[0]
+    P2[-1] = -1
+    
+    for k in xrange(N-1):
+        P1 = P2*a[k+1] - numpy.append(P2[1::],[0]) - P1*b[k]**2
+        P2, P1 = P1, P2
+        #print(P1, P2)        
+        
+    return P2
+
+def Hyman_val(x, P):
+    n = len(P)
+    x = x[0] # für fsolve    
+    
+    code = r'''
+        double P_x = 0;    
+    
+        for(int i = 0; i < n; i++) {
+            
+            int power = n - i;
+            double result = 1.0;
+            
+            for (int j = 1; j < power; j++) {
+                result = result * x;
+            }
+                     
+            P_x += P[i] * result;
+        }
+        
+        return_val = P_x;
+    '''
+
+    P_x = weave.inline(code,['n','x','P'])
+    
+    return P_x
+
+def QR(a,b,delta,h_max):
+    # QR Algorithmus mittels Givens Rotations Matrizen
+    # für Tridiagonalmatrix
+    # a ... Hauptdiagonale
+    # b ... Nebendiagonale
+
+    n = len(a)
+    
+    code = r'''
+    
+        for(int h = 0; h < h_max; h++) {
+            
+            double t = b[0];
+            double sum_b = 0;
+            double c[n] = { 0 };
+            double s[n] = { 0 };            
+            
+            // erzeugen von R = G * A
+            for(int i = 0; i < n-1; i++) {
+                
+                double r = sqrt(a[i]*a[i] + t*t);
+                c[i] = a[i] / r;
+                s[i] = t / r;
+                
+                t = b[i];
+                
+                a[i] = r;
+                b[i] = t*c[i] + a[i+1]*s[i];
+                a[i+1] = -t*s[i] + a[i+1]*c[i];
+                
+                if(i != n-2) {
+                    t = b[i+1];
+                    b[i+1] = t*c[i];
+                }
+            }
+            
+            // multiplikation mit Q = R * (G)T
+            for(int j = 0; j < n-1; j++) {
+
+                a[j] = a[j]*c[j] + b[j]*s[j];
+                b[j] = a[j+1]*s[j];
+                a[j+1] = a[j+1]*c[j];
+                
+                double add = b[j];
+                if(add < 0) {add = -add;}
+                sum_b = sum_b + add;
+            }
+            
+            return_val = sum_b;
+            
+            if(sum_b < delta) {break;}
+            
+        }
+       
+    '''
+
+    sum_b = weave.inline(code,['n','a','b','delta','h_max'])
+    
+    return a, sum_b
+
+def Mises(a,b,n_max,d):
+    #a ... Hauptdiagonale
+    #b ... Nebendiagonale
+    n = len(a)
+    
+    code = r'''
+        double v1[n] = { 1 };
+        double v2[n] = { 1 };
+        
+        double lam1 = 0;
+        double lam2 = 0;
+    
+        for(int h = 0; h < n_max; h++) {
+            
+            lam2 = 0;
+            
+            for(int i = 0; i < n; i++) {
+                
+                if(i == 0) {
+                    v2[i] = a[i]*v1[i] + b[i]*v1[i+1];
+                }
+                else if(i == n-1) {
+                    v2[i] = a[i]*v1[i] + b[i-1]*v1[i-1];
+                }
+                else {
+                    v2[i] = a[i]*v1[i] + b[i]*v1[i+1] + b[i-1]*v1[i-1];
+                }
+                
+                double d_test = v1[i] * v1[i];
+                
+                if(d_test > 1e-8) {
+                    lam2 += v2[i] / v1[i];
+                }
+                
+            }
+            lam2 = lam2/n; 
+            double d_lam = abs(lam2 - lam1);
+            
+            if(d_lam < d) {
+                break;
+            }
+            
+            lam1 = lam2;
+        }
+        
+        return_val = lam2;
+    '''
+
+    lam = weave.inline(code,['n','a','b','n_max','d',])
+    
+    return lam
+    
 # Main
 
 N = 3 # matrix zeile
@@ -269,27 +420,28 @@ NN = nearest_neighbours(N,M)
 # berechne Matrix des Heisenberg Hamilton Operators
 print('hamiltonian')
 H = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
-#print('H',H.shape)
 
 # transformiere H in eine sparse Matrix
 print('csr_matrix')
 H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
+
 # lanczos
 print('lanczos')
-x, epsilon, k, E = lanczos(H, len(spin), 0.001, 10000,4)
+x, epsilon, k, E = lanczos(H, len(spin), 1e-2, 10000, 5)
 
+# plot
 print('plotten')
-E = numpy.array(E)
-print(E.shape)
 
 fig2 = plt.figure()
 fig2.show()
+plt.xlim(-1,len(E))
+plt.ylim(-5,5)
+
 for i in range(len(E)):
     for j in range(len(E[i])):
         plt.plot(i,E[i][j],'or')
-plt.xlim(-1,len(E))
-    
 
+    
 #plt.plot(E[1], 'g')
 #plt.plot(E[:,2], 'b')
 #plt.plot(E[:,3], 'k')
