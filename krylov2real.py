@@ -244,42 +244,35 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
         x0 = x1
         x1 = Hx1
         
-    return(x1, epsilon, k, E, a,b)
+    return(x1, epsilon, k, E, a,b,n)
     
     
-def lanczos2(H, size_basis, delta, n_max, n_diag, c_matrix):
+def lanczos2(H, size_basis, n_max, c_matrix):
     
     Hx1 = numpy.array([0.0]*size_basis) # initialisiere Produkt von H mit Vektor x_n
     x0 = numpy.array([0.0]*size_basis) # initialisiere Vektor x_n-1
     x1 = numpy.random.rand(size_basis) # initialisiere Vektor x_n
     x1 /= numpy.sqrt(x1.dot(x1))
-    psi = numpy.array([[0.0]*size_basis]*len(x1)) # initialisiere Ortsraumvektor
+    psi = numpy.array([0.0]*n_max]) # initialisiere Ortsraumvektor
+    k = 0    
     
-    epsilon = numpy.array([0.0]*(n_max+1))
-    k = numpy.array([0.0]*(n_max+1))
-    
-    breakvar=0;
-    for n in xrange(size_basis):
-        
-        psi[n,:] = numpy.transpose(c_matrix) * x1        # Transformiere von Krylovbasis in Eigenbasis
-        if n > n_max: break
+    for n in xrange(n_max):
         
         if n > 0:
-            k[n] = numpy.sqrt(x1.dot(x1))
-            
-            if k[n] < delta: breakvar=1
-            else: x1 /= k[n]
+            k = numpy.sqrt(x1.dot(x1))
+            x1 /= k
             
         Hx1 = H.dot(x1)
-        epsilon[n] = x1.dot(Hx1)
-        
-        if (breakvar==1): break
-        
-        Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
+        epsilon = x1.dot(Hx1)
+                
+        Hx1 = Hx1 - epsilon*x1 - k*x0
         x0 = x1
         x1 = Hx1
         
-    return(x1, epsilon, k, psi)
+        # Transformiere von Krylovbasis in Eigenbasis
+        psi[n] = c_vector.dot(x1)
+        
+    return(psi)
 
 def QR(a,b,delta,h_max):
     # QR Algorithmus mittels Givens Rotations Matrizen
@@ -362,8 +355,7 @@ NN = nearest_neighbours(N,M)
 
 # berechne Matrix des Heisenberg Hamilton Operators
 print('hamiltonian')
-H_old = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
-H = H_old
+H = hamilton_diag(spin_up, spin_down, spin, NN, N*M)
 
 # transformiere H in eine sparse Matrix
 print('csr_matrix')
@@ -371,17 +363,15 @@ H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
 # lanczos
 print('lanczos')
-x, epsilon, k, E, a, b = lanczos(H, len(spin), 1e-2, 10000, 2)
+x, epsilon, k, E, a, b, n_runs = lanczos(H, len(spin), 1e-2, 10000, 2)
 
 # Eigenvektoren
-c_matrix = numpy.array([[[0.0]*len(spin)]*len(E)])
-for k in xrange(E):
-    c_vector = spsolve(H_old-E[k]*numpy.eye(len(spin)), numpy.array([0.0]*len(spin)))
-    c_matrix[:,k] = c_vector
+ind = 0 #index des (größten) Eigenwerts
+c_vector = spsolve(H - E[ind]*numpy.eye(len(spin)), numpy.array([0.0]*len(spin)))
 
 # lanczos2
 print('lanczos2')
-x, epsilon, k, psi = lanczos2(H, len(spin), 1e-2, 10000, 2, c_matrix)
+psi = lanczos2(H, len(spin), n_runs, c_vector)
 
 
 
