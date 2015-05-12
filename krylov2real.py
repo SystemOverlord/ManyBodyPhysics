@@ -245,7 +245,7 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
         x0 = x1
         x1 = Hx1
         
-    return(x1, epsilon, k, E, a,b,n)
+    return(x1, epsilon[0:n], k[0:n], E, n)
     
     
 def lanczos2(H, size_basis, n_max, c_matrix):
@@ -271,7 +271,7 @@ def lanczos2(H, size_basis, n_max, c_matrix):
         x1 = Hx1
         
         # Transformiere von Krylovbasis in Eigenbasis
-        psi[n] = c_vector.dot(x1)
+        psi[n] = c_vector.dot(x1[0:len(c_vector)])
         
     return(psi)
 
@@ -282,15 +282,15 @@ def QR(a,b,delta,h_max):
     # b ... Nebendiagonale
 
     n = len(a)
-    
+    c = numpy.array([0.0]*n)
+    s = numpy.array([0.0]*n)
+ 
     code = r'''
     
         for(int h = 0; h < h_max; h++) {
             
             double t = b[0];
             double sum_b = 0;
-            double c[n] = { 0 };
-            double s[n] = { 0 };            
             
             // erzeugen von R = G * A
             for(int i = 0; i < n-1; i++) {
@@ -331,7 +331,7 @@ def QR(a,b,delta,h_max):
        
     '''
 
-    sum_b = weave.inline(code,['n','a','b','delta','h_max'])
+    sum_b = weave.inline(code,['n','a','b','delta','h_max','c','s'])
     
     return a,sum_b
 
@@ -347,19 +347,16 @@ def T_Rn(Rn,psi, len_psi):
 
 def eigenvec(e,k,EW):
     c = numpy.array([1.0]*len(e))
-
     
-    c[-2] = (-e[-1] + EW) / k[-2]
+    c[-2] = (-e[-1] + EW) / k[-1]
     
-    for n in xrange(3,len(e)):
-        c[-n] = -( k[-n+1]*c[-n+2] + c[-n+1]*(e[-n+2] - EW)) / k[-n]
+    for n in xrange(3,len(e)+1):
+        c[-n] = -( k[-n+2]*c[-n+2] + c[-n+1]*(e[-n+2] - EW)) / k[-n+1]
+    
+    c /= numpy.linalg.norm(c)
     
     return c
         
-        
-        
-    
-    
 #        
 #def karylov2ort(Rn_max,psi):
 #    psi_t = psi
@@ -396,20 +393,15 @@ H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
 # lanczos
 print('lanczos')
-x, epsilon, k, E, a, b, n_runs = lanczos(H, len(spin), 1e-2, 10000, 2)
+x, epsilon, k, E, n_runs = lanczos(H, len(spin), 1e-2, 10000, 2)
 
 # Eigenvektoren
-
-c_vector = eigenvec(a,b,E[-1][1])
-#ind = -1 #index des (größten) Eigenwerts
-#c_vector = spsolve(H - (E[ind][1]*numpy.eye(len(spin))), numpy.array([0.0]*len(spin)))
+c_vector = eigenvec(epsilon,k,E[-1][1])
 
 # lanczos2
-print('c_vector',c_vector)
-print('lanczos2')
+print('psi')
 psi = lanczos2(H, len(spin), n_runs, c_vector)
 print(psi)
-
 
 
 # plot
