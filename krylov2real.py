@@ -235,6 +235,7 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
             if len(E) > 1:
                 if abs(E[-2][0] - E[-1][0]) < 1e-8 and abs(E[-2][1] - E[-1][1]) < 1e-8:
                     breakvar = 1
+                    
             
             print(n_max,n,sumb)
         
@@ -253,7 +254,7 @@ def lanczos2(H, size_basis, n_max, c_matrix):
     x0 = numpy.array([0.0]*size_basis) # initialisiere Vektor x_n-1
     x1 = numpy.random.rand(size_basis) # initialisiere Vektor x_n
     x1 /= numpy.sqrt(x1.dot(x1))
-    psi = numpy.array([0.0]*n_max]) # initialisiere Ortsraumvektor
+    psi = numpy.array([0.0]*n_max) # initialisiere Ortsraumvektor
     k = 0    
     
     for n in xrange(n_max):
@@ -334,12 +335,44 @@ def QR(a,b,delta,h_max):
     
     return a,sum_b
 
+# Permutationsoperator 
+def T_Rn(Rn,psi, len_psi):
+        
+    y = psi
+    rest = psi & 1
+    y = y >> 1
+    if rest == 1:
+        y |= (1 << len_psi) 
+    
+
+def eigenvec(e,k,EW):
+    c = numpy.array([1.0]*len(e))
+
+    
+    c[-2] = (-e[-1] + EW) / k[-2]
+    
+    for n in xrange(3,len(e)):
+        c[-n] = -( k[-n+1]*c[-n+2] + c[-n+1]*(e[-n+2] - EW)) / k[-n]
+    
+    return c
+        
+        
+        
+    
+    
+#        
+#def karylov2ort(Rn_max,psi):
+#    psi_t = psi
+#    k = numpy.linspace(0,2*numpy.pi,Rn_max)
+#    for Rn in range(Rn_max):
+#        psi_t = 0
+#        y
     
 # Main
 
 N = 3 # matrix zeile
 M = 3 # matrix spalte
-N2 = 5 #total number of particles with spin up
+N2 = 3 #total number of particles with spin up
 
 spin = numpy.array([2**N2-1], dtype=int)
 spin_up = numpy.array([0], dtype=int)
@@ -366,12 +399,16 @@ print('lanczos')
 x, epsilon, k, E, a, b, n_runs = lanczos(H, len(spin), 1e-2, 10000, 2)
 
 # Eigenvektoren
-ind = 0 #index des (größten) Eigenwerts
-c_vector = spsolve(H - E[ind]*numpy.eye(len(spin)), numpy.array([0.0]*len(spin)))
+
+c_vector = eigenvec(a,b,E[-1][1])
+#ind = -1 #index des (größten) Eigenwerts
+#c_vector = spsolve(H - (E[ind][1]*numpy.eye(len(spin))), numpy.array([0.0]*len(spin)))
 
 # lanczos2
+print('c_vector',c_vector)
 print('lanczos2')
 psi = lanczos2(H, len(spin), n_runs, c_vector)
+print(psi)
 
 
 

@@ -198,11 +198,11 @@ def bisection(spin, tofind):
         
     return(None)
 
-def lanczos(H, size_basis, delta, n_max, n_diag):
+def lanczos(H, size_basis, delta, edelta, n_max, n_diag,x1):
     
     Hx1 = numpy.array([0.0]*size_basis) # initialisiere Produkt von H mit Vektor x_n
     x0 = numpy.array([0.0]*size_basis) # initialisiere Vektor x_n-1
-    x1 = numpy.random.rand(size_basis) # initialisiere Vektor x_n
+    
     
     epsilon = numpy.array([0.0]*(n_max+1))
     k = numpy.array([0.0]*(n_max+1))
@@ -224,16 +224,25 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
             epsilon[n] = numpy.dot(x1, Hx1)
         
         if (((n+1) % n_diag) == 0) or (breakvar == 1):
-            P = Hyman(epsilon[0:n],k[0:n])
+            #P = Hyman(epsilon[0:n],k[0:n])
             #E0 = fsolve(Hyman_val, 1e300, args=(P), maxfev=int(1000))
             #E1 = fsolve(Hyman_val, -1e300, args=(P), maxfev=int(1000))
             #E0 = numpy.roots(P)
             #E0 = Mises(epsilon[0:n],k[0:n],10000,0.0001)
             #E += [numpy.array([E0,E0])]
-            E0,sumb = QR(epsilon[0:n],k[0:n],0.001,100)
-            E += [E0]
+            a=numpy.array(epsilon[0:n])
+            b=numpy.array(k[0:n])
+            E0,b,sumb = QR(a,b,0.001,1000)
+            E += [numpy.array([min(E0),max(E0)])]
             
             print(n_max,n,sumb)
+            
+            if len(E) > 1:
+                if(abs(E[-2][0] -E[-1][0])< edelta or abs(E[-2][1] -E[-1][1])< edelta ): 
+                    breakvar = 1            
+            
+            
+            
         
         if (breakvar==1): break
         Hx1 = Hx1 - epsilon[n]*x1 - k[n]*x0
@@ -295,6 +304,8 @@ def QR(a,b,delta,h_max):
 
     n = len(a)
     
+    c = numpy.array([0]*n)
+    s = numpy.array([0]*n)
     code = r'''
     
         for(int h = 0; h < h_max; h++) {
@@ -345,7 +356,7 @@ def QR(a,b,delta,h_max):
 
     sum_b = weave.inline(code,['n','a','b','delta','h_max'])
     
-    return a, sum_b
+    return a, b, sum_b
 
 def Mises(a,b,n_max,d):
     #a ... Hauptdiagonale
@@ -403,7 +414,7 @@ def Mises(a,b,n_max,d):
 
 N = 3 # matrix zeile
 M = 3 # matrix spalte
-N2 = 4 #total number of particles with spin up
+N2 = 7 #total number of particles with spin up
 
 spin = numpy.array([2**N2-1], dtype=int)
 spin_up = numpy.array([0], dtype=int)
@@ -427,7 +438,8 @@ H = csr_matrix(( H[:,2], (H[:,0], H[:,1]) ), shape=(len(spin), len(spin)))
 
 # lanczos
 print('lanczos')
-x, epsilon, k, E = lanczos(H, len(spin), 1e-2, 10000, 5)
+x1 = numpy.random.rand(len(spin)) # initialisiere Vektor x_n
+x, epsilon, k, E = lanczos(H, len(spin), 1e-2,1e-9, 100, 3,x1)
 
 # plot
 print('plotten')
@@ -435,11 +447,13 @@ print('plotten')
 fig2 = plt.figure()
 fig2.show()
 plt.xlim(-1,len(E))
-plt.ylim(-5,5)
+#plt.ylim(-5,5)
 
 for i in range(len(E)):
-    for j in range(len(E[i])):
-        plt.plot(i,E[i][j],'or')
+    #for j in range(len(E[i])):
+    plt.plot(i,max(E[i]),'or')
+    plt.plot(i,min(E[i]),'or')
+    print(max(E[i]),min(E[i]))
 
     
 #plt.plot(E[1], 'g')
