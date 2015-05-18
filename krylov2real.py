@@ -336,14 +336,14 @@ def QR(a,b,delta,h_max):
     return a,sum_b
 
 # Permutationsoperator 
-def T_Rn(Rn,psi, len_psi):
-        
+def T_Rn(Rn, psi, len_psi):        
     y = psi
-    rest = psi & 1
-    y = y >> 1
-    if rest == 1:
-        y |= (1 << len_psi) 
-    
+    for x in xrange(Rn):
+        rest = psi & 1
+        y = y >> 1
+        if rest == 1:
+            y |= (1 << len_psi) 
+    return y
 
 def eigenvec(e,k,EW):
     c = numpy.array([1.0]*len(e))
@@ -357,13 +357,21 @@ def eigenvec(e,k,EW):
     
     return c
         
-#        
-#def karylov2ort(Rn_max,psi):
+        
+def psi2phi(Rn_max,psi):
 #    psi_t = psi
-#    k = numpy.linspace(0,2*numpy.pi,Rn_max)
-#    for Rn in range(Rn_max):
-#        psi_t = 0
-#        y
+   
+    phi = numpy.array([1.0]*Rn_max, dtype=complex)
+    
+    k = numpy.linspace(0,2*numpy.pi,Rn_max)
+    
+    for k in xrange(len(psi)):        
+        for Rn in xrange(Rn_max):            
+            #psi_t = T_Rn(Rn,psi[Rn])
+            phi[k] += numpy.exp(1j*2*numpy.pi*k*Rn/Rn_max) * psi[Rn]
+        phi[k] /= Rn_max
+    return phi
+    
     
 # Main
 
@@ -403,6 +411,9 @@ print('psi')
 psi = lanczos2(H, len(spin), n_runs, c_vector)
 print(psi)
 
+print('phi')
+phi = psi2phi(len(psi), psi)
+print(phi)
 
 # plot
 print('plotten')
