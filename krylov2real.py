@@ -336,14 +336,16 @@ def QR(a,b,delta,h_max):
     return a,sum_b
 
 # Permutationsoperator 
-def T_Rn(Rn, psi, len_psi):        
+def T_Rn(Rn, psi): 
+    global spin
+    global N2       
     y = psi
     for x in xrange(Rn):
         rest = psi & 1
         y = y >> 1
         if rest == 1:
-            y |= (1 << len_psi) 
-    return y
+            y |= (1 << N2) 
+    return bisection(spin,y)
 
 def eigenvec(e,k,EW):
     c = numpy.array([1.0]*len(e))
@@ -358,26 +360,32 @@ def eigenvec(e,k,EW):
     return c
         
         
-def psi2phi(Rn_max,psi):
-#    psi_t = psi
-   
-    phi = numpy.array([1.0]*Rn_max, dtype=complex)
+def psi2phi(psi,kanz,H):
+    global N
+    global M
+    global spin
     
-    k = numpy.linspace(0,2*numpy.pi,Rn_max)
+    phi = numpy.array([1.0]*len(spin), dtype=complex)
+    E = numpy.array([0.0]*kanz, dtype=complex)
     
-    for k in xrange(len(psi)):        
-        for Rn in xrange(Rn_max):            
-            #psi_t = T_Rn(Rn,psi[Rn])
-            phi[k] += numpy.exp(1j*2*numpy.pi*k*Rn/Rn_max) * psi[Rn]
-        phi[k] /= Rn_max
-    return phi
+    k = numpy.linspace(0,2*numpy.pi,kanz)
+    for kn in xrange(len(k)):
+        for Rn in xrange(M*N):
+            for n in xrange(len(psi)):
+                ind = T_Rn(Rn,spin[n])
+                phi[ind] += numpy.exp(1j*Rn*k[kn]) * psi[n]
+        
+        E[kn] = numpy.conjugate(phi).dot(H.dot(phi))
+        
+    return E
+    
     
     
 # Main
 
-N = 3 # matrix zeile
-M = 3 # matrix spalte
-N2 = 3 #total number of particles with spin up
+N = 1 # matrix zeile
+M = 8  # matrix spalte
+N2 = 4 #total number of particles with spin up
 
 spin = numpy.array([2**N2-1], dtype=int)
 spin_up = numpy.array([0], dtype=int)
@@ -411,10 +419,22 @@ print('psi')
 psi = lanczos2(H, len(spin), n_runs, c_vector)
 print(psi)
 
-print('phi')
-phi = psi2phi(len(psi), psi)
-print(phi)
+print('Ek')
+Ek = psi2phi( psi, 100,H)
+print(Ek)
 
+# plot
+print('plott Ek')
+
+fig1 = plt.figure()
+fig1.show()
+#plt.xlim(0,2*numpy.pi)
+
+for i in range(len(Ek)):
+    plt.plot(i,Ek[i].real,'or')
+    
+    
+    
 # plot
 print('plotten')
 
@@ -429,3 +449,6 @@ for i in range(len(E)):
 
 # zu Testzwecken fertiger Lanczos
 print eigsh(H)[0]
+
+
+
