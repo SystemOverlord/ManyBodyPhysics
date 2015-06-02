@@ -237,7 +237,7 @@ def lanczos(H, size_basis, delta, n_max, n_diag):
                     breakvar = 1
                     
             
-            print(n_max,n,sumb)
+            #print(n_max,n,sumb)
         
         if (breakvar==1): break
         
@@ -417,11 +417,11 @@ c_vector = eigenvec(epsilon,k,E[-1][1])
 # lanczos2
 print('psi')
 psi = lanczos2(H, len(spin), n_runs, c_vector)
-print(psi)
+#print(psi)
 
 print('Ek')
 Ek = psi2phi( psi, 100,H)
-print(Ek)
+#print(Ek)
 
 # plot
 print('plott Ek')
@@ -445,10 +445,10 @@ plt.xlim(-1,len(E))
 for i in range(len(E)):
     plt.plot(i,E[i][0],'or')
     plt.plot(i,E[i][1],'or')
-    print(E[i][0], E[i][1])
+    #print(E[i][0], E[i][1])
 
 # zu Testzwecken fertiger Lanczos
-print eigsh(H)[0]
+#print eigsh(H)[0]
 
 
 
