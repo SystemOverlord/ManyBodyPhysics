@@ -10,96 +10,109 @@ import matplotlib.pyplot as plt
 import random
 
 
-def Startconf(anzTeilchen,anzSpinUp):
-    conf = np.array([bool(0)]*anzTeilchen)
-    i = 0
-    while i < anzSpinUp:
-        tmp = random.randint(0, anzTeilchen-1)
-        if conf[tmp] == 0:
-            conf[tmp] = 1
-            i = i+1
-    return conf
+def Startconf(anzTeilchen,anzSpinUp,anzZeitschritte):
     
-def FeldindizesXY(gitter):
-    xmax = np.shape(gitter)[0]-1
-    ymax = np.shape(gitter)[1]-1
-    indizesXY = np.array([[[[0]*2]*4]*xmax]*ymax)
+    weltlinien = np.array([[False]*anzTeilchen]*anzZeitschritte)    
+    zahl = []
+    zahl0 = random.randint(1,anzTeilchen-1)
     
-    for y in xrange(ymax):
-        for x in xrange(xmax):
-            #print('x:',x,'/',xmax,'y:',y,'/',ymax,'shape:',np.shape(indizesXY))
-            indizesXY[y][x][0][0] = x     # oben links X
-            indizesXY[y][x][0][1] = y+1   # oben links Y
-            indizesXY[y][x][1][0] = x+1   # oben rechts X
-            indizesXY[y][x][1][1] = y+1   # oben rechts Y
-            indizesXY[y][x][2][0] = x     # unten links X
-            indizesXY[y][x][2][1] = y     # unten links Y       
-            indizesXY[y][x][3][0] = x+1   # unten rechts X
-            indizesXY[y][x][3][1] = y     # unten rechts Y
+    for k in range(anzSpinup-1):
+        while zahl0 in zahl:
+            zahl0 = random.randint(1,anzTeilchen-1)
 
-            if x == 0 and y == 0:
-                indizesBereinigt = [indizesXY[y][x]]
-            if (y%2 == x%2) and not (x==0 and y==0): 
-                #print np.shape(indizesXY[y][x]),np.shape(indizesBereinigt)
-                indizesBereinigt = np.concatenate((indizesBereinigt,[indizesXY[y][x]]))
-    return indizesXY, indizesBereinigt
+        zahl += [zahl0]
+        weltlinien[:,zahl0] = True
     
-def Gitterplot():
-    fig1 = plt.figure()
-    fig1.show()
-    for t in xrange(anzZeitschritte):
-        for i in xrange(anzTeilchen):
-            if gitter[t][i]:
-                plt.plot(i,t,'ro')    
-        
+    return weltlinien
+       
     
 
 def loop(anzZeitschritte, anzTeilchen,termination, weltlinien):
-    x = np.array([0]*termination)              # Initialisierung
-    y = np.array([0]*termination) 
-    x[0] = random.randint(0,anzTeilchen-1)
-    y[0] = random.randint(0,anzZeitschritte-1)     
-    breakvar = 0
+    x = np.array([0.0]*termination)              # Initialisierung
+    y = np.array([0.0]*termination) 
     
-    walk = random.randint(1,4)
+    x[0] = random.randint(0,anzTeilchen-1)
+    y[0] = random.randint(0,anzZeitschritte-1)  
+    while weltlinien[x[0],y[0]] == 0:
+        x[0] = random.randint(0,anzTeilchen-1)
+        y[0] = random.randint(0,anzZeitschritte-1)
+            
+    breakvar = 0
+
+    if x[0]%2 == 0: walk = 1
+    else: walk = 4
+    
     walkOld = walk
 
     for k in range(1,termination): 
+        print(k)
         if k%2 == 0:  # Jeder zweite Schritt geht doppelt
             walk = random.randint(1,4)
-            while (walkOld + walk == 4) | (walkOld +walk == 6) :    # Verhindere Richtungsumkehr
-                walk = random.randint(1,4)
-
-            walkOld = walk 
-        
-        # switch für Schritt
-        if walk == 1: #rechts
-            x[k] = x[k-1]+1
-            y[k] = y[k-1]
-        elif walk == 2: #unten
-            x[k] = x[k-1]
-            y[k]= y[k-1]-1
-        elif walk == 3: #links
-            x[k] = x[k-1]-1
-            y[k] = y[k-1]
-        elif walk == 4: #oben
-            x[k] = x[k-1]
-            y[k] = y[k-1]+1
+            
+            breakvar1 = True
+            
+            while breakvar1:
                 
-        # Periodische Randbedingungen        
-        if x[k] == anzTeilchen:
-            x[k] = 0
-        if x[k] == -1:
-            x[k] = anzTeilchen-1
-        if y[k] == anzZeitschritte:
-            y[k] = 0
-        if y[k] == -1:
-            y[k] = anzTeilchen-1
+                walk = random.randint(1,4)
+                
+                # Verhindere Richtungsumkehr
+                if not ( (walkOld == 1 and walk == 3) or (walkOld == 3 and walk == 1) or (walkOld == 2 and walk == 4) or (walkOld == 4 and walk == 2) ):
+                    breakvar1 = False
+                        
+                # überprüft of schrittrichtungssinn der Pfeilfolge folgt
+                if breakvar1 == False:
+                    
+                    # switch für Schritt
+                    if walk == 1: #rechts
+                        x[k] = x[k-1]+0.5
+                        y[k] = y[k-1]+0.5
+                    elif walk == 2: #unten
+                        x[k] = x[k-1]+0.5
+                        y[k]= y[k-1]-0.5
+                    elif walk == 3: #links
+                        x[k] = x[k-1]-0.5
+                        y[k] = y[k-1]-0.5
+                    elif walk == 4: #oben
+                        x[k] = x[k-1]-0.5
+                        y[k] = y[k-1]+0.5    
+
+                    # Periodische Randbedingungen        
+                    if x[k] == anzTeilchen:
+                        x[k] = 0
+                    if x[k] == -1:
+                        x[k] = anzTeilchen-1
+                    if y[k] == anzZeitschritte:
+                        y[k] = 0
+                    if y[k] == -1:
+                        y[k] = anzTeilchen-1
+                    print(weltlinien[x[k],y[k]], walk)
+                    if (walk == 1 or walk == 4) and weltlinien[x[k],y[k]] == False: breakvar1 = True
+                    if (walk == 2 or walk == 3) and weltlinien[x[k],y[k]] == True: breakvar1 = True
+
+            walkOld = walk
+        
+        else:
+            # switch für Schritt
+            if walk == 1: #rechts
+                x[k] = x[k-1]+0.5
+                y[k] = y[k-1]+0.5
+            elif walk == 2: #unten
+                x[k] = x[k-1]+0.5
+                y[k]= y[k-1]-0.5
+            elif walk == 3: #links
+                x[k] = x[k-1]-0.5
+                y[k] = y[k-1]-0.5
+            elif walk == 4: #oben
+                x[k] = x[k-1]-0.5
+                y[k] = y[k-1]+0.5
+
         
         # Suche ob Loop sich beißt
         for l in range(0,k):
             if (x[l]== x[k]) & (y[l] == y[k]):                
                 print('break',l)
+                x = x[l:k]
+                y = y[l:k]
                 breakvar = 1
                 break
             
@@ -107,49 +120,34 @@ def loop(anzZeitschritte, anzTeilchen,termination, weltlinien):
             return x,y,l,k
             break
     
-        k += 1
 
         
     return x,y,l,k                
 
 
 
-anzTeilchen = 10
-anzZeitschritte = 10
+anzTeilchen = 5
+anzSpinup = 3
+anzZeitschritte = 5
 termination = 100
-x,y,l,k = loop(anzZeitschritte, anzTeilchen, termination,1)
-print('x', x[l:k+1])
-print('y', y[l:k+1])
-print('l= ',l, 'k = ',k)
 
-fig = plt.figure()
-plt.plot(x[l:k],y[l:k])
-plt.grid()
-plt.xlim(-1, anzTeilchen)
-plt.ylim(-1,anzZeitschritte)
+weltlinien = Startconf(anzTeilchen,anzSpinup,anzZeitschritte)
 
 
+print(weltlinien)
+x,y,l,k = loop(anzZeitschritte, anzTeilchen, termination,weltlinien)
+
+print(x)
+#weltlinien[x[::2],y[::2]] = weltlinien[x[::2],y[::2]] | True
+print(weltlinien)
 
 
-if __name__ == '__main__':    
+#print('x', x[l:k+1])
+#print('y', y[l:k+1])
+#print('l= ',l, 'k = ',k)
 
-    anzTeilchen = 5       
-    anzSpinUp = 2
-    anzZeitschritte = 4   # muss durch 2 teilbar sein
-    
-    gitter = np.array([Startconf(anzTeilchen,anzSpinUp)]*anzZeitschritte)
-    indizesXY, indizesBereinigt = FeldindizesXY(gitter)
-    
-    
-    
-#    #============== Plot Felder =================
-#    fig=plt.figure()
-#    for i in xrange(np.shape(indizesBereinigt)[0]):    
-#        plt.plot(indizesBereinigt[i][:,1],indizesBereinigt[i][:,0])   
-#    plt.xlim(-1,anzTeilchen)
-#    plt.ylim(-1,anzZeitschritte)
-
-
-
-    
-    
+#fig = plt.figure()
+#plt.plot(x[l:k],y[l:k])
+#plt.grid()
+#plt.xlim(-1, anzTeilchen)
+#plt.ylim(-1,anzZeitschritte)
