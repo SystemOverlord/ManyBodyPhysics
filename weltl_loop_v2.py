@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import time
+from scipy import weave
 
 
 def Startconf(anzTeilchen,anzSpinUp,anzZeitschritte):
@@ -183,6 +184,60 @@ def gewichter(weltlinien, weight):
                 
     return weightConfig, ns, nd
 
+def gewichter2(weltlinien, weight):
+
+#    mask1 = np.array([[1,0],[1,0]])
+#    mask2 = np.array([[0,1],[0,1]])
+#    mask3 = np.array([[1,0],[0,1]])
+#    mask4 = np.array([[0,1],[1,0]])
+    
+    N = np.shape(weltlinien)[0]-1
+    M = np.shape(weltlinien)[1]-1
+    
+    ns_py = np.array([0])
+    nd_py = np.array([0])
+    
+    code = r'''
+    int ns = 0;
+    int nd = 0;
+    
+    for(int n = 0; n < N; n++) {
+        for(int m = 0; m < M; m++) {
+            
+            if (n%2 == m%2) {
+                int links_unten = weltlinien[n,m];
+                int rechts_unten = weltlinien[n,m+1];
+                int links_oben = weltlinien[n+1,m];
+                int rechts_oben = weltlinien[n+1,m+1];
+                
+                if(links_unten == 1 && rechts_unten == 0 && links_oben == 1) {
+                    ns = ns + 1;
+                    }
+                
+                if(links_unten == 0 && rechts_unten == 1 && links_oben == 0) {
+                    ns = ns + 1;
+                    }
+            
+                if(links_unten == 1 && rechts_unten == 0 && links_oben == 0) {
+                    nd = nd + 1;
+                    }
+                    
+                if(links_unten == 0 && rechts_unten == 1 && links_oben == 1) {
+                    nd = nd + 1;
+                    }
+            }
+        }    
+    }
+    
+    ns_py[0] = ns;
+    nd_py[0] = nd;
+    
+    '''
+
+    weave.inline(code,['N','M','weltlinien', 'ns_py', 'nd_py'])
+    
+    return ns_py, nd_py
+
 
 t0 = time.time()
 # Parameter
@@ -226,7 +281,9 @@ for n in xrange(1,anzMarkovZeit):
         weltlinien[int(x[k]),int(y[k])] = weltlinien[int(x[k]),int(y[k])] ^ True 
         
     # Gewichter der Weltlinienkonfiguration berechnen   
-    weightConfig, ns, nd = gewichter(weltlinien, weight) 
+    ns, nd = gewichter2(weltlinien, weight) 
+    print(ns, nd)
+    
     test_meanNs = ns
     test_meanNd = nd
      
