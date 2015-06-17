@@ -144,7 +144,7 @@ def loop(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien):
     return x,y,l,k
 
 
-def gewichter(weltlinien, weight):
+def gewichter(weltlinien):
 
     mask1 = np.array([[1,0],[1,0]])
     mask2 = np.array([[0,1],[0,1]])
@@ -155,7 +155,6 @@ def gewichter(weltlinien, weight):
     
     ns = 0
     nd = 0
-    weightConfig = 1
     for k in xrange(np.shape(weltlinien)[0]-1):
         for l in xrange(np.shape(weltlinien)[1]-1):
     
@@ -182,20 +181,19 @@ def gewichter(weltlinien, weight):
                 #elif np.array_equal(configPlakette, mask5): weightConfig *= weight[4]
                # elif np.array_equal(configPlakette, mask6): weightConfig *= weight[5]    
                 
-    return weightConfig, ns, nd
+    return ns, nd
 
-def gewichter2(weltlinien, weight):
+def gewichter2(weltlinien):
 
 #    mask1 = np.array([[1,0],[1,0]])
 #    mask2 = np.array([[0,1],[0,1]])
 #    mask3 = np.array([[1,0],[0,1]])
 #    mask4 = np.array([[0,1],[1,0]])
     
-    N = np.shape(weltlinien)[0]-1
-    M = np.shape(weltlinien)[1]-1
-    
-    ns_py = np.array([0])
-    nd_py = np.array([0])
+    N = int(np.shape(weltlinien)[0]-1)
+    M = int(np.shape(weltlinien)[1]-1)
+    ns_py = 0
+    nd_py = 0
     
     code = r'''
     int ns = 0;
@@ -210,42 +208,50 @@ def gewichter2(weltlinien, weight):
                 int links_oben = weltlinien[n+1,m];
                 int rechts_oben = weltlinien[n+1,m+1];
                 
-                if(links_unten == 1 && rechts_unten == 0 && links_oben == 1) {
+                if(links_unten == 1 & rechts_unten == 0 & links_oben == 1) {
                     ns = ns + 1;
                     }
                 
-                if(links_unten == 0 && rechts_unten == 1 && links_oben == 0) {
+                if(links_unten == 0 & rechts_unten == 1 & links_oben == 0) {
                     ns = ns + 1;
                     }
             
-                if(links_unten == 1 && rechts_unten == 0 && links_oben == 0) {
+                if(links_unten == 1 & rechts_unten == 0 & links_oben == 0) {
                     nd = nd + 1;
                     }
                     
-                if(links_unten == 0 && rechts_unten == 1 && links_oben == 1) {
+                if(links_unten == 0 & rechts_unten == 1 & links_oben == 1) {
                     nd = nd + 1;
                     }
             }
         }    
     }
-    
-    ns_py[0] = ns;
-    nd_py[0] = nd;
-    
+    int ns_py = ns;
+    int nd_py = nd;
+
     '''
 
-    weave.inline(code,['N','M','weltlinien', 'ns_py', 'nd_py'])
+    weave.inline(code,['N','M','weltlinien'])
     
     return ns_py, nd_py
 
 
+def autocorr(x):
+    result = np.correlate(x, x, mode = 'full')
+    maxcorr = np.argmax(result)
+    #print 'maximum = ', result[maxcorr]
+    result = result / result[maxcorr]     # <=== normalization
+
+    return result[result.size/2:]
+
+
 t0 = time.time()
 # Parameter
-anzTeilchen = 51
-anzSpinup = 6
-anzZeitschritte = 100
+anzTeilchen = 100
+anzSpinup = 11
+anzZeitschritte = 50
 termination = anzTeilchen*anzZeitschritte
-anzMarkovZeit = 110
+anzMarkovZeit = 20
 m = anzTeilchen
 
 Jz = -1.
@@ -255,7 +261,7 @@ beta = 1.
 
 meanNs = np.array([0]*anzMarkovZeit)
 meanNd = np.array([0]*anzMarkovZeit)
-energy = np.array([0]*anzMarkovZeit)
+energy = np.array([0.]*anzMarkovZeit)
 
 weight1 = np.exp(deltaTau*Jz/4)*np.cosh(deltaTau*Jx/2)
 weight3 = -np.exp(deltaTau*Jz/4)*np.sinh(deltaTau*Jx/2)  
@@ -281,15 +287,15 @@ for n in xrange(1,anzMarkovZeit):
         weltlinien[int(x[k]),int(y[k])] = weltlinien[int(x[k]),int(y[k])] ^ True 
         
     # Gewichter der Weltlinienkonfiguration berechnen   
-    ns, nd = gewichter2(weltlinien, weight) 
-    print(ns, nd)
+    ns, nd = gewichter(weltlinien) 
+    #print(ns, nd)
     
     test_meanNs = ns
     test_meanNd = nd
      
     test_energy = - test_meanNs*Jz/(2*m) *(np.tanh(beta*Jz/(2*m))-1) - test_meanNd*Jz/(2*m) *(1/np.tanh(beta*Jz/(2*m))-1) #- Jz*anzTeilchen/4  (kürzt sich in MC)
     
-    if exp(-beta*(test_energy-energy[n-1])) < np.random.rand(1):
+    if np.exp(-beta*(test_energy-energy[n-1])) < np.random.rand(1):
         weltlinien = weltlinienOld
         meanNs[n] = meanNs[n-1]
         meanNd[n] = meanNd[n-1]
@@ -303,3 +309,15 @@ for n in xrange(1,anzMarkovZeit):
 
 energyMean = - sum(meanNs)/anzMarkovZeit*Jz/(2*m) *(np.tanh(beta*Jz/(2*m))-1) - sum(meanNd)/anzMarkovZeit*Jz/(2*m) *(1/np.tanh(beta*Jz/(2*m))-1) #- Jz*anzTeilchen/4  (kürzt sich in MC)
 print(energyMean, np.mean(energy))
+
+auto = autocorr(energy)
+
+figAuto = plt.figure()
+plt.plot(auto)
+plt.ylabel('Autocorrelation')
+plt.xlabel('Markov Time')
+
+figEnergy = plt.figure()
+plt.plot(energy)
+plt.ylabel('Energy')
+plt.xlabel('Markov Time')
