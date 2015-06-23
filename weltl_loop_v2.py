@@ -18,7 +18,7 @@ def Startconf(anzTeilchen,anzSpinUp,anzZeitschritte):
     zahl = []
     zahl0 = random.randint(1,anzTeilchen-1)
     
-    for k in range(anzSpinup):
+    for k in range(anzSpinUp):
         while zahl0 in zahl:
             zahl0 = random.randint(1,anzTeilchen-1)
 
@@ -158,14 +158,14 @@ def gewichter(weltlinien):
     for k in xrange(np.shape(weltlinien)[0]-1):
         for l in xrange(np.shape(weltlinien)[1]-1):
     
-            if k%2 == l%2: # Gitterpunkt ist links unterer Punkt der aktiven Plakette
-                links_unten = weltlinien[k,l]
-                rechts_unten = weltlinien[k,l+1]
-                links_oben = weltlinien[k+1,l]
-                rechts_oben = weltlinien[k+1,l+1]
+            if not k%2 == l%2: # Gitterpunkt ist links unterer Punkt der aktiven Plakette
+                links_unten = weltlinien[k+1,l]
+                rechts_unten = weltlinien[k+1,l+1]
+                links_oben = weltlinien[k,l]
+                rechts_oben = weltlinien[k,l+1]
                 
                 configPlakette = np.array([[links_oben, rechts_oben],[links_unten,rechts_unten]])
-                
+                #print(configPlakette)
                 if np.array_equal(configPlakette, mask1): 
                     #weightConfig *= weight[0]
                     ns += 1
@@ -184,54 +184,54 @@ def gewichter(weltlinien):
     return ns, nd
 
 def gewichter2(weltlinien):
-
-#    mask1 = np.array([[1,0],[1,0]])
-#    mask2 = np.array([[0,1],[0,1]])
-#    mask3 = np.array([[1,0],[0,1]])
-#    mask4 = np.array([[0,1],[1,0]])
+    N = int(np.shape(weltlinien)[0])
+    M = int(np.shape(weltlinien)[1])
     
-    N = int(np.shape(weltlinien)[0]-1)
-    M = int(np.shape(weltlinien)[1]-1)
-    ns_py = 0
-    nd_py = 0
+    ns_py = np.array([0])
+    nd_py = np.array([0])
     
     code = r'''
     int ns = 0;
     int nd = 0;
     
-    for(int n = 0; n < N; n++) {
-        for(int m = 0; m < M; m++) {
+    for(int n = 0; n < N-1; n++) {
+        for(int m = 0; m < M-1; m++) {
             
-            if (n%2 == m%2) {
-                int links_unten = weltlinien[n,m];
-                int rechts_unten = weltlinien[n,m+1];
-                int links_oben = weltlinien[n+1,m];
-                int rechts_oben = weltlinien[n+1,m+1];
+            if (n%2 != m%2) {
+                int index1 = (n+1)*M + m;
+                int index2 = (n+1)*M + m + 1;
+                int index3 = (n)*M + m;
+                int index4 = (n)*M + m + 1;
                 
-                if(links_unten == 1 & rechts_unten == 0 & links_oben == 1) {
-                    ns = ns + 1;
+                int links_unten = weltlinien[index1];
+                int rechts_unten = weltlinien[index2];
+                int links_oben = weltlinien[index3];
+                int rechts_oben = weltlinien[index4];
+                
+                if(links_unten == 1 & rechts_unten == 0 & links_oben == 1 & rechts_oben == 0) {
+                    ns += 1;
                     }
                 
-                if(links_unten == 0 & rechts_unten == 1 & links_oben == 0) {
-                    ns = ns + 1;
+                else if(links_unten == 0 & rechts_unten == 1 & links_oben == 0 & rechts_oben == 1) {
+                    ns += 1;
                     }
             
-                if(links_unten == 1 & rechts_unten == 0 & links_oben == 0) {
-                    nd = nd + 1;
+                else if(links_unten == 1 & rechts_unten == 0 & links_oben == 0 & rechts_oben == 1) {
+                    nd += 1;
                     }
                     
-                if(links_unten == 0 & rechts_unten == 1 & links_oben == 1) {
-                    nd = nd + 1;
+                else if(links_unten == 0 & rechts_unten == 1 & links_oben == 1 & rechts_oben == 0) {
+                    nd += 1;
                     }
             }
         }    
     }
-    int ns_py = ns;
-    int nd_py = nd;
+    ns_py[0] = ns;
+    nd_py[0] = nd;
 
     '''
 
-    weave.inline(code,['N','M','weltlinien'])
+    weave.inline(code,['N','M','ns_py','nd_py','weltlinien'])
     
     return ns_py, nd_py
 
@@ -251,13 +251,13 @@ anzTeilchen = 100
 anzSpinup = 11
 anzZeitschritte = 50
 termination = anzTeilchen*anzZeitschritte
-anzMarkovZeit = 20
+anzMarkovZeit = 2000
 m = anzTeilchen
 
 Jz = -1.
 Jx = -1.
 deltaTau = 1.
-beta = 1.
+beta = 0.1
 
 meanNs = np.array([0]*anzMarkovZeit)
 meanNd = np.array([0]*anzMarkovZeit)
@@ -287,12 +287,11 @@ for n in xrange(1,anzMarkovZeit):
         weltlinien[int(x[k]),int(y[k])] = weltlinien[int(x[k]),int(y[k])] ^ True 
         
     # Gewichter der Weltlinienkonfiguration berechnen   
-    ns, nd = gewichter(weltlinien) 
-    #print(ns, nd)
+    ns, nd = gewichter2(weltlinien)
     
     test_meanNs = ns
     test_meanNd = nd
-     
+    
     test_energy = - test_meanNs*Jz/(2*m) *(np.tanh(beta*Jz/(2*m))-1) - test_meanNd*Jz/(2*m) *(1/np.tanh(beta*Jz/(2*m))-1) #- Jz*anzTeilchen/4  (kürzt sich in MC)
     
     if np.exp(-beta*(test_energy-energy[n-1])) < np.random.rand(1):
@@ -309,6 +308,7 @@ for n in xrange(1,anzMarkovZeit):
 
 energyMean = - sum(meanNs)/anzMarkovZeit*Jz/(2*m) *(np.tanh(beta*Jz/(2*m))-1) - sum(meanNd)/anzMarkovZeit*Jz/(2*m) *(1/np.tanh(beta*Jz/(2*m))-1) #- Jz*anzTeilchen/4  (kürzt sich in MC)
 print(energyMean, np.mean(energy))
+print(t0 - time.time())
 
 auto = autocorr(energy)
 
