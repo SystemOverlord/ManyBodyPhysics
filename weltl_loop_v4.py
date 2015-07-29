@@ -17,6 +17,8 @@ def Startconf(anzTeilchen,anzSpinUp,anzZeitschritte):
     zahl = []
     zahl0 = random.randint(1,anzTeilchen-1)
     
+#    weltlinien[:,::2] = True
+    
     for k in range(anzSpinUp):
         while zahl0 in zahl:
             zahl0 = random.randint(1,anzTeilchen-1)
@@ -148,7 +150,7 @@ def loop1(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien):
             
     return x,y,l,k
 
-def walk_neu(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walkOld, gs, gd):
+def walk_neu(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walkOld, gs, gd, beta):
 
     #w = np.tanh(Jz*beta/anzZeitschritte)
     #w = np.exp(beta * (gs_ratio - gd_ratio) )
@@ -201,7 +203,59 @@ def walk_neu(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walkOld, gs, gd)
         exit(1)
         
     return walk
-       
+
+def walk_neu2(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walkOld, gs, gd, beta):
+
+    #w = np.tanh(Jz*beta/anzZeitschritte)
+    #w = np.exp(beta * (gs_ratio - gd_ratio) )
+    
+    mask1 = np.array([[0,0],[0,0]])
+    mask2 = np.array([[1,1],[1,1]])
+    mask3 = np.array([[1,0],[1,0]])
+    mask4 = np.array([[0,1],[0,1]])
+    mask5 = np.array([[1,0],[0,1]])
+    mask6 = np.array([[0,1],[1,0]])
+    
+    walk_h = np.array([2, 1, 4, 3])
+    walk_v = np.array([4, 3, 2, 1])
+    
+    x_u = x[k-1]+0.5
+    x_o = x[k-1]-0.5
+    y_r = y[k-1]+0.5
+    y_l = y[k-1]-0.5
+                
+    # Periodische Randbedingungen        
+    if x_u == anzZeitschritte: x_u = 0
+    if x_o == -1: x_o = anzZeitschritte-1
+    if y_r == anzTeilchen: y_r = 0
+    if y_l == -1: y_l = anzTeilchen-1
+            
+    links_unten = weltlinien[x_u, y_l]
+    rechts_unten = weltlinien[x_u, y_r]
+    links_oben = weltlinien[x_o, y_l]
+    rechts_oben = weltlinien[x_o, y_r]
+                
+    plakette = np.array([[links_oben, rechts_oben],[links_unten,rechts_unten]])
+                
+    # Plaketten vom Typ 1+, 1- (siehe Everz S9)
+    if np.array_equal(plakette, mask1) or np.array_equal(plakette, mask2):
+        walk = walk_v[walkOld-1]
+                
+    # Plaketten vom Typ 2+, 2- (siehe Everz S9)
+    elif np.array_equal(plakette, mask3) or np.array_equal(plakette, mask4):
+        if random.random() < np.tanh(beta/anzZeitschritte): walk = walk_h[walkOld-1]
+        else: walk = walk_v[walkOld-1]
+                
+    # Plaketten vom Typ 3+, 3- (siehe Everz S9)
+    elif np.array_equal(plakette, mask5) or np.array_equal(plakette, mask6):
+        walk = walk_h[walkOld-1]
+                    
+    else:
+        print 'Plakette verboten'
+        exit(1)
+        
+    return walk
+   
 def loop2(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien, Jz, beta, gs, gd):
     
     weltlinienschnitt = 0  
@@ -227,7 +281,7 @@ def loop2(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien, Jz, 
         for k in xrange(1,termination):
             
             if k%2 == 0:  # Jeder zweite Schritt geht doppelt
-                walk = walk_neu(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walk, gs, gd)
+                walk = walk_neu(anzZeitschritte, anzTeilchen, weltlinien, x, y, k, walk, gs, gd, beta)
             
             # switch für Schritt
             
@@ -240,8 +294,7 @@ def loop2(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien, Jz, 
             elif walk == 3: #links
                 x[k] = x[k-1]+0.5
                 y[k] = y[k-1]-0.5
-            #elif walk == 4: #oben
-            else:
+            else: #oben
                 x[k] = x[k-1]-0.5
                 y[k] = y[k-1]-0.5
             
@@ -298,9 +351,12 @@ def loop2(anzZeitschritte, anzTeilchen, anzSpinup, termination, weltlinien, Jz, 
         
     return x,y,l,k, update
 
-def gewichter2(weltlinien):
-    N = int(np.shape(weltlinien)[0])
-    M = int(np.shape(weltlinien)[1])
+def gewichter(weltlinien):
+    weltlinien_neu = np.hstack((weltlinien, weltlinien[:,0].reshape(-1, 1)))
+    weltlinien_neu = np.vstack((weltlinien, weltlinien[0,:]))
+    
+    N = int(np.shape(weltlinien_neu)[0])
+    M = int(np.shape(weltlinien_neu)[1])
     
     ns_py = np.array([0])
     nd_py = np.array([0])
@@ -322,10 +378,10 @@ def gewichter2(weltlinien):
                 int index3 = n*M + m;
                 int index4 = n*M + m + 1;
                 
-                int links_unten = weltlinien[index1];
-                int rechts_unten = weltlinien[index2];
-                int links_oben = weltlinien[index3];
-                int rechts_oben = weltlinien[index4];
+                int links_unten = weltlinien_neu[index1];
+                int rechts_unten = weltlinien_neu[index2];
+                int links_oben = weltlinien_neu[index3];
+                int rechts_oben = weltlinien_neu[index4];
                 
                 int valide = 0;
                 if(links_unten == links_oben && rechts_oben == rechts_unten && rechts_unten != links_oben) {
@@ -352,7 +408,7 @@ def gewichter2(weltlinien):
 
     '''
 
-    weave.inline(code,['N','M','ns_py','nd_py','n0_py','val_py','weltlinien'])
+    weave.inline(code,['N','M','ns_py','nd_py','n0_py','val_py','weltlinien_neu'])
     
     if val_py !=0:
         print val_py
@@ -379,7 +435,10 @@ anzMarkovZeit = 10000
 
 Jz = 1.
 Jx = 1.
-beta = 20
+beta = 10.
+print(np.tanh(beta/anzZeitschritte))
+# um tatsächlich richte Anzahl der Zeitschritte zu machen
+#anzZeitschritte += 1
 
 gs = np.exp(-Jz*beta/anzZeitschritte) * np.cosh(Jx*beta/anzZeitschritte)
 gd = np.exp(-Jz*beta/anzZeitschritte) * np.sinh(Jx*beta/anzZeitschritte)
@@ -393,6 +452,9 @@ energy = np.array([0.]*(anzMarkovZeit-1))
 
 # Start
 weltlinien = Startconf(anzTeilchen,anzSpinup,anzZeitschritte)
+#print(weltlinien)
+#print(gewichter(weltlinien))
+#print((-ns*gs_ratio - nd*gd_ratio)/anzTeilchen - Jz/4)
 
 ## heat up array
 #for m in xrange(20):
@@ -417,22 +479,28 @@ for n in xrange(anzMarkovZeit-1):
             weltlinien[int(x[k]),int(y[k])] = weltlinien[int(x[k]),int(y[k])] ^ True
         
     # Gewichter der Weltlinienkonfiguration berechnen   
-    ns, nd, n0 = gewichter2(weltlinien)
-        
+    ns, nd, n0 = gewichter(weltlinien)
+    
     test_energy = -ns*gs_ratio - nd*gd_ratio
     test_energy /= anzTeilchen
         
     meanNs[n] = int(ns)
     meanNd[n] = int(nd)
     meanN0[n] = int(n0)
-    energy[n] = test_energy - Jz/4
+    energy[n] = float(test_energy - Jz/4)
         
 
-mean_ns = np.mean(meanNs)
-mean_nd = np.mean(meanNd)
+mean_ns = np.mean(meanNs[anzMarkovZeit/2:anzMarkovZeit])
+mean_nd = np.mean(meanNd[anzMarkovZeit/2:anzMarkovZeit])
+std_ns = np.std(meanNs[anzMarkovZeit/2:anzMarkovZeit])
+std_nd = np.std(meanNd[anzMarkovZeit/2:anzMarkovZeit])
+
 mean_E = -mean_ns*gs_ratio - mean_nd*gd_ratio
 mean_E /= anzTeilchen
 mean_E -= Jz/4
+
+std_E = std_ns*gs_ratio + std_nd*gd_ratio
+std_E /= anzTeilchen
 
 print('E_mean', mean_E)
 #print(np.mean(energy[1000::]) - Jz/4)
@@ -449,6 +517,7 @@ figEnergy = plt.figure()
 plt.plot(energy)
 plt.ylabel('Energy')
 plt.xlabel('Markov Time')
+plt.title('Energy = '+str(mean_E)+' +- '+str(std_E))
 
 figPlaketten = plt.figure()
 plt.plot(meanN0, '-k', label='S1')
